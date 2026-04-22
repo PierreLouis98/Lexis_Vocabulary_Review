@@ -1,0 +1,11 @@
+[build]
+nixpkgs.rev = "main"
+
+[phases.setup]
+nixPkgs = ["nodejs_18"]
+
+[phases.build]
+cmds = ["cd backend && npm install"]
+
+[phases.start]
+cmd = "cd backend && npm run init-db && npm start"
