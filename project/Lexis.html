@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Lexis — Mobile Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; overscroll-behavior: none; }
+  body { font-family: 'Inter', -apple-system, system-ui, sans-serif; }
+  *, *::before, *::after { box-sizing: border-box; }
+  #root { height: 100vh; }
+  button { font-family: inherit; }
+  .lx-live ::-webkit-scrollbar { width: 0; height: 0; }
+  .lx-live { scrollbar-width: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="android-frame.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="exercises.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+
+<script type="text/babel">
+// ─── App — drives navigation + shared state ──────────────────
+function LexisApp({ initial = 'home', showTabBar = true, startingLibrary, onScreenChange, forcedScreen }) {
+  const [screen, setScreen] = React.useState(initial);
+  const [user, setUser] = React.useState(INITIAL_USER);
+  const [library, setLibrary] = React.useState(startingLibrary || WORDS.filter((w) => w.level !== 'suggested').map((w) => w.id));
+  const [result, setResult] = React.useState(null);
+
+  // honour forcedScreen (used for static screenshots in canvas)
+  React.useEffect(() => {
+    if (forcedScreen) setScreen(forcedScreen);
+  }, [forcedScreen]);
+
+  React.useEffect(() => { onScreenChange && onScreenChange(screen); }, [screen]);
+
+  const addWord = (id) => setLibrary((l) => l.includes(id) ? l : [...l, id]);
+
+  const content = () => {
+    switch (screen) {
+      case 'login': return <ScreenLogin onGoto={setScreen} />;
+      case 'signup': return <ScreenSignup onGoto={setScreen} />;
+      case 'home': return <ScreenHome user={user} onGoto={setScreen} />;
+      case 'library': return <ScreenLibrary library={library} onAdd={addWord} />;
+      case 'exercise': return <ScreenExercise onDone={(r) => { setResult(r); setScreen('result'); }} onExit={() => setScreen('home')} />;
+      case 'result': return <ScreenResult result={result || { correct: 4, total: 5 }} onHome={() => setScreen('home')} />;
+      case 'stats': return <ScreenHome user={user} onGoto={setScreen} />;
+      case 'profile': return <ScreenHome user={user} onGoto={setScreen} />;
+      default: return <ScreenHome user={user} onGoto={setScreen} />;
+    }
+  };
+
+  const hideTabs = !showTabBar || ['login', 'signup', 'exercise', 'result'].includes(screen);
+
+  return (
+    <div className="lx-live" style={{ height: '100%', position: 'relative', background: LX.bg }}>
+      {content()}
+      {!hideTabs && <TabBar tab={screen} onTab={setScreen} />}
+    </div>
+  );
+}
+
+// ─── Canvas assembly ─────────────────────────────────────────
+const IOS_W = 390, IOS_H = 844;
+const AND_W = 412, AND_H = 892;
+
+function IOSFrame({ children }) {
+  return (
+    <div style={{
+      width: IOS_W, height: IOS_H, borderRadius: 48, overflow: 'hidden',
+      position: 'relative', background: LX.bg,
+      boxShadow: '0 40px 80px rgba(0,0,0,0.25), 0 0 0 10px #1a1a1d, 0 0 0 11px rgba(255,255,255,0.08)',
+    }}>
+      {/* dynamic island */}
+      <div style={{
+        position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+        width: 120, height: 35, borderRadius: 24, background: '#000', zIndex: 90,
+      }} />
+      <div style={{ height: '100%', width: '100%' }}>{children}</div>
+      {/* home indicator */}
+      <div style={{
+        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+        width: 135, height: 5, borderRadius: 100, background: 'rgba(255,255,255,0.85)', zIndex: 100,
+      }} />
+    </div>
+  );
+}
+
+function AndroidFrame({ children }) {
+  return (
+    <div style={{
+      width: AND_W, height: AND_H, borderRadius: 44, overflow: 'hidden',
+      position: 'relative', background: LX.bg,
+      boxShadow: '0 40px 80px rgba(0,0,0,0.25), 0 0 0 8px #2a2a2e, 0 0 0 9px rgba(255,255,255,0.08)',
+    }}>
+      {/* camera punch-hole */}
+      <div style={{
+        position: 'absolute', left: '50%', top: 12, transform: 'translateX(-50%)',
+        width: 22, height: 22, borderRadius: 100, background: '#000', zIndex: 90,
+      }} />
+      <div style={{ height: '100%', width: '100%' }}>{children}</div>
+      {/* gesture bar */}
+      <div style={{
+        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+        width: 108, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.5)', zIndex: 100,
+      }} />
+    </div>
+  );
+}
+
+// Static frame (renders a frozen screen without navigation)
+function StaticScreen({ screen, lib }) {
+  return <LexisApp initial={screen} forcedScreen={screen} startingLibrary={lib} showTabBar={!['login','signup','exercise','result'].includes(screen)} />;
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="flow-ios" title="Lexis · iOS" subtitle="Prototype complet — clique sur « Commencer » pour jouer l'exercice">
+        <DCArtboard id="ios-live" label="Prototype live (navigable)" width={IOS_W} height={IOS_H}>
+          <IOSFrame><LexisApp initial="login" /></IOSFrame>
+        </DCArtboard>
+        <DCArtboard id="ios-login" label="1. Connexion" width={IOS_W} height={IOS_H}>
+          <IOSFrame><StaticScreen screen="login" /></IOSFrame>
+        </DCArtboard>
+        <DCArtboard id="ios-signup" label="2. Inscription" width={IOS_W} height={IOS_H}>
+          <IOSFrame><StaticScreen screen="signup" /></IOSFrame>
+        </DCArtboard>
+        <DCArtboard id="ios-home" label="3. Accueil / Dashboard" width={IOS_W} height={IOS_H}>
+          <IOSFrame><StaticScreen screen="home" /></IOSFrame>
+        </DCArtboard>
+        <DCArtboard id="ios-lib" label="4. Bibliothèque + carrousel" width={IOS_W} height={IOS_H}>
+          <IOSFrame><StaticScreen screen="library" /></IOSFrame>
+        </DCArtboard>
+        <DCArtboard id="ios-ex" label="5. Exercice du jour" width={IOS_W} height={IOS_H}>
+          <IOSFrame><StaticScreen screen="exercise" /></IOSFrame>
+        </DCArtboard>
+        <DCArtboard id="ios-result" label="6. Résultat" width={IOS_W} height={IOS_H}>
+          <IOSFrame><StaticScreen screen="result" /></IOSFrame>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="flow-android" title="Lexis · Android" subtitle="Même flow, frame Android">
+        <DCArtboard id="and-live" label="Prototype live (navigable)" width={AND_W} height={AND_H}>
+          <AndroidFrame><LexisApp initial="login" /></AndroidFrame>
+        </DCArtboard>
+        <DCArtboard id="and-login" label="1. Connexion" width={AND_W} height={AND_H}>
+          <AndroidFrame><StaticScreen screen="login" /></AndroidFrame>
+        </DCArtboard>
+        <DCArtboard id="and-signup" label="2. Inscription" width={AND_W} height={AND_H}>
+          <AndroidFrame><StaticScreen screen="signup" /></AndroidFrame>
+        </DCArtboard>
+        <DCArtboard id="and-home" label="3. Accueil / Dashboard" width={AND_W} height={AND_H}>
+          <AndroidFrame><StaticScreen screen="home" /></AndroidFrame>
+        </DCArtboard>
+        <DCArtboard id="and-lib" label="4. Bibliothèque + carrousel" width={AND_W} height={AND_H}>
+          <AndroidFrame><StaticScreen screen="library" /></AndroidFrame>
+        </DCArtboard>
+        <DCArtboard id="and-ex" label="5. Exercice du jour" width={AND_W} height={AND_H}>
+          <AndroidFrame><StaticScreen screen="exercise" /></AndroidFrame>
+        </DCArtboard>
+        <DCArtboard id="and-result" label="6. Résultat" width={AND_W} height={AND_H}>
+          <AndroidFrame><StaticScreen screen="result" /></AndroidFrame>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
